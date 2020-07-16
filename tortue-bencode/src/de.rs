@@ -332,6 +332,11 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
             let list = value.unwrap_list();
 
             visitor.visit_seq(seq::SeqAccess::new(list))
+        } else if self.input.is_bin() {
+            let mut value = BencodedValue::None;
+            swap(&mut self.input, &mut value);
+
+            visitor.visit_byte_buf(value.unwrap_bin())
         } else {
             Err(Error::Message(format!(
                 "cannot convert from {:?} to list",

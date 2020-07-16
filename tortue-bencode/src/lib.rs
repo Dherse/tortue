@@ -7,6 +7,10 @@ pub mod de;
 pub mod error;
 pub mod ser;
 
+pub use de::{from_bytes, from_value};
+pub use parser::{parse, parse_all, parse_all_incomplete};
+pub use ser::{to_bytes, to_value, to_writer};
+
 /// A bencoded value that has been parsed
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BencodedValue<'a> {
@@ -45,6 +49,14 @@ impl<'a> BencodedValue<'a> {
         match self {
             BencodedValue::Binary(_) | BencodedValue::BinaryOwned(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn unwrap_bin(self) -> Vec<u8> {
+        match self {
+            BencodedValue::Binary(v) => v.to_vec(),
+            BencodedValue::BinaryOwned(v) => v,
+            _ => panic!("not a bin"),
         }
     }
 
