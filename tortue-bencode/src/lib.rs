@@ -44,6 +44,12 @@ pub enum BencodedValue<'a> {
     None,
 }
 
+impl<'a> Default for BencodedValue<'a> {
+    fn default() -> Self {
+        BencodedValue::None
+    }
+}
+
 impl<'a> BencodedValue<'a> {
     pub fn is_bin(&self) -> bool {
         match self {

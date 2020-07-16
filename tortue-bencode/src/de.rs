@@ -1,6 +1,6 @@
 use crate::{error::Error, parser, BencodedValue};
 use serde::{de, Deserialize};
-use std::mem::swap;
+use std::mem::{self, swap};
 
 mod map;
 mod seq;
@@ -76,7 +76,7 @@ impl<'data> Deserializer<'data> {
         match &self.input {
             BencodedValue::String(value) => {
                 if value.len() == 1 {
-                    Ok(value.chars().nth(0).unwrap())
+                    Ok(value.chars().next().unwrap())
                 } else {
                     Err(Error::Message(
                         "incorrect char from string conversion".to_owned(),
@@ -85,7 +85,7 @@ impl<'data> Deserializer<'data> {
             }
             BencodedValue::StringOwned(value) => {
                 if value.len() == 1 {
-                    Ok(value.chars().nth(0).unwrap())
+                    Ok(value.chars().next().unwrap())
                 } else {
                     Err(Error::Message(
                         "incorrect char from string conversion".to_owned(),
@@ -99,7 +99,7 @@ impl<'data> Deserializer<'data> {
         }
     }
 
-    pub fn parse_str<'de>(&'de self) -> Result<&'de str, Error> {
+    pub fn parse_str(&self) -> Result<&str, Error> {
         match &self.input {
             BencodedValue::String(value) => Ok(value),
             BencodedValue::StringOwned(value) => Ok(value),
@@ -121,7 +121,7 @@ impl<'data> Deserializer<'data> {
         }
     }
 
-    pub fn parse_bytes<'a>(&'a self) -> Result<&'a [u8], Error> {
+    pub fn parse_bytes(&self) -> Result<&[u8], Error> {
         match &self.input {
             BencodedValue::Binary(value) => Ok(value),
             BencodedValue::BinaryOwned(value) => Ok(value),
@@ -326,10 +326,7 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         if self.input.is_list() {
-            let mut value = BencodedValue::None;
-            swap(&mut self.input, &mut value);
-
-            let list = value.unwrap_list();
+            let list = mem::take(&mut self.input).unwrap_list();
 
             visitor.visit_seq(seq::SeqAccess::new(list))
         } else if self.input.is_bin() {
@@ -373,12 +370,9 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         if self.input.is_dict() {
-            let mut value = BencodedValue::None;
-            swap(&mut self.input, &mut value);
+            let map = mem::take(&mut self.input).unwrap_dict();
 
-            let list = value.unwrap_dict();
-
-            visitor.visit_map(map::MapAccess::new(list))
+            visitor.visit_map(map::MapAccess::new(map))
         } else {
             Err(Error::Message(format!(
                 "cannot convert from {:?} to list",

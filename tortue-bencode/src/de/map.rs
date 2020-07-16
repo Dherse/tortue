@@ -20,7 +20,7 @@ impl<'re> MapAccess<'re> {
     }
 }
 
-impl<'de, 'da> de::MapAccess<'de> for MapAccess<'de> {
+impl<'de> de::MapAccess<'de> for MapAccess<'de> {
     type Error = Error;
 
     fn next_key_seed<K>(
@@ -44,7 +44,8 @@ impl<'de, 'da> de::MapAccess<'de> for MapAccess<'de> {
             let mut deser = super::Deserializer::from_value(
                 BencodedValue::StringOwned(key),
             )?;
-            let out = seed.deserialize(&mut deser).map(|v| Some(v))?;
+            let out = seed.deserialize(&mut deser)
+                .map(Some)?;
 
             Ok(out)
         }

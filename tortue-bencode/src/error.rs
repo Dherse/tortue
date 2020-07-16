@@ -1,4 +1,4 @@
-use nom::error::{self, ErrorKind};
+use nom::error::ErrorKind;
 use serde::{de, ser};
 use std::{
     fmt::{self, Display},

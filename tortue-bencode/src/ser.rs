@@ -45,7 +45,7 @@ where
 
     value
         .serialize(&mut serializer)
-        .map_err(|e| Into::<io::Error>::into(e))?;
+        .map_err(Into::<io::Error>::into)?;
 
     Ok(if serializer.output.len() == 1 {
         serializer.output.pop().unwrap()

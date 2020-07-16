@@ -12,12 +12,12 @@ impl<'re> SeqAccess<'re> {
         SeqAccess {
             index: 0,
             len: values.len(),
-            values: values,
+            values,
         }
     }
 }
 
-impl<'de, 'da> de::SeqAccess<'de> for SeqAccess<'de> {
+impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
     type Error = Error;
 
     fn next_element_seed<T>(
@@ -33,7 +33,7 @@ impl<'de, 'da> de::SeqAccess<'de> for SeqAccess<'de> {
             self.index += 1;
             let mut deser =
                 super::Deserializer::from_value(self.values.remove(0))?;
-            let out = seed.deserialize(&mut deser).map(|v| Some(v))?;
+            let out = seed.deserialize(&mut deser).map(Some)?;
 
             Ok(out)
         }

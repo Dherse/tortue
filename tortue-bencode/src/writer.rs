@@ -34,12 +34,12 @@ pub fn write_str<'a, T: Write>(str: &'a str, writer: &mut T) -> io::Result<()> {
     writer.write_all(format!("{}:{}", str.len(), str).as_bytes())
 }
 
-pub fn write_int<'a, T: Write>(int: i64, writer: &mut T) -> io::Result<()> {
+pub fn write_int<T: Write>(int: i64, writer: &mut T) -> io::Result<()> {
     writer.write_all(format!("i{}e", int).as_bytes())
 }
 
 pub fn write_list<'a, T: Write>(
-    list: &Vec<BencodedValue<'a>>,
+    list: &[BencodedValue<'a>],
     writer: &mut T,
 ) -> io::Result<()> {
     writer.write_all(b"l")?;
