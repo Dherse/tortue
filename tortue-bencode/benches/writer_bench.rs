@@ -2,9 +2,8 @@ use criterion::{
     black_box, criterion_group, criterion_main, Criterion, Throughput,
 };
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
 use tortue_bencode::{
-    from_bytes, from_value, parser::parse, to_value, to_writer, writer::write,
+    from_value, parser::parse, to_value, to_writer, writer::write,
 };
 
 const DATA: &[u8] = include_bytes!("test_data");

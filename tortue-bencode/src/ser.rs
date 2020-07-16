@@ -13,8 +13,9 @@ use std::{
 mod compound;
 
 #[derive(Default)]
-pub struct Serializer<'se>(PhantomData<BencodedValue<'se>>);
+pub(crate) struct Serializer<'se>(PhantomData<BencodedValue<'se>>);
 
+/// Serializes a data structure into a byte vec
 pub fn to_bytes<T>(value: &T) -> std::result::Result<Vec<u8>, io::Error>
 where
     T: Serialize,
@@ -24,6 +25,7 @@ where
     Ok(out)
 }
 
+/// Serializes a data structure into a writer
 pub fn to_writer<T, W>(
     value: &T,
     writer: &mut W,
@@ -35,9 +37,10 @@ where
     writer::write(&to_value(value)?, writer)
 }
 
-pub fn to_value<'a, T>(
-    value: &'a T,
-) -> std::result::Result<BencodedValue<'a>, io::Error>
+/// Serializes a data structure into a BencodedValue
+pub fn to_value<T>(
+    value: &'_ T,
+) -> std::result::Result<BencodedValue<'_>, io::Error>
 where
     T: Serialize,
 {
@@ -189,11 +192,11 @@ impl<'serializer> ser::Serializer for Serializer<'serializer> {
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
-        Ok(Compound::new_array(self, len))
+        Ok(Compound::new_array(len))
     }
 
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
-        Ok(Compound::new_array(self, Some(len)))
+        Ok(Compound::new_array(Some(len)))
     }
 
     fn serialize_tuple_struct(
@@ -201,7 +204,7 @@ impl<'serializer> ser::Serializer for Serializer<'serializer> {
         _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct> {
-        Ok(Compound::new_map(self, Some(len)))
+        Ok(Compound::new_map(Some(len)))
     }
 
     fn serialize_tuple_variant(
@@ -211,11 +214,11 @@ impl<'serializer> ser::Serializer for Serializer<'serializer> {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        Ok(Compound::new_map(self, Some(0)))
+        Ok(Compound::new_map(Some(0)))
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap> {
-        Ok(Compound::new_map(self, len))
+        Ok(Compound::new_map(len))
     }
 
     fn serialize_struct(
@@ -223,7 +226,7 @@ impl<'serializer> ser::Serializer for Serializer<'serializer> {
         _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct> {
-        Ok(Compound::new_map(self, Some(len)))
+        Ok(Compound::new_map(Some(len)))
     }
 
     fn serialize_struct_variant(
@@ -233,7 +236,7 @@ impl<'serializer> ser::Serializer for Serializer<'serializer> {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
-        Ok(Compound::new_map(self, Some(0)))
+        Ok(Compound::new_map(Some(0)))
     }
 }
 

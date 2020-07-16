@@ -22,7 +22,7 @@ pub use crate::BencodedValue;
 pub fn parse<'a>(input: &'a [u8]) -> IResult<&'a [u8], BencodedValue<'a>> {
     alt((
         map(int::parse_int, BencodedValue::Integer),
-        map(list::parse_list, BencodedValue::List),
+        list::parse_list,
         map(dictionary::parse_dictionary, BencodedValue::Dictionary),
         map(string::parse_string, BencodedValue::String),
         map(bytes::parse_bytes, BencodedValue::Binary),
@@ -31,15 +31,30 @@ pub fn parse<'a>(input: &'a [u8]) -> IResult<&'a [u8], BencodedValue<'a>> {
 
 /// Parses an input string and returns a Vec<BencodedValue>, fails if the string is not fully consummed
 #[inline]
-pub fn parse_all<'a>(
-    input: &'a [u8],
-) -> IResult<&'a [u8], Vec<BencodedValue<'a>>> {
+pub fn parse_all<'a>(input: &'a [u8]) -> IResult<&'a [u8], BencodedValue<'a>> {
     all_consuming(parse_all_incomplete)(input)
+}
+
+/// Parses an input string and returns a grouped BencodedValue, does **not** fail if the string is not fully consummed
+#[inline]
+pub fn parse_all_incomplete<'a>(
+    input: &'a [u8],
+) -> IResult<&'a [u8], BencodedValue<'a>> {
+    let mut iter = iterator(input, parse);
+    let values = iter.collect::<Vec<_>>();
+    let (rest, _) = iter.finish()?;
+    if values.is_empty() {
+        Ok((rest, BencodedValue::None))
+    } else if values.len() == 1 {
+        Ok((rest, values.into_iter().next().unwrap()))
+    } else {
+        Ok((rest, BencodedValue::List(values)))
+    }
 }
 
 /// Parses an input string and returns a Vec<BencodedValue>, does **not** fail if the string is not fully consummed
 #[inline]
-pub fn parse_all_incomplete<'a>(
+pub fn parse_all_no_group<'a>(
     input: &'a [u8],
 ) -> IResult<&'a [u8], Vec<BencodedValue<'a>>> {
     let mut iter = iterator(input, parse);
@@ -63,7 +78,10 @@ mod parse_tests {
             parse_all(b"i3ei4e"),
             Ok((
                 b"" as _,
-                vec![BencodedValue::Integer(3), BencodedValue::Integer(4)]
+                BencodedValue::List(vec![
+                    BencodedValue::Integer(3),
+                    BencodedValue::Integer(4)
+                ])
             ))
         );
 
@@ -76,7 +94,10 @@ mod parse_tests {
             parse_all(b"i3e4:abcd"),
             Ok((
                 b"" as _,
-                vec![BencodedValue::Integer(3), BencodedValue::String("abcd")]
+                BencodedValue::List(vec![
+                    BencodedValue::Integer(3),
+                    BencodedValue::String("abcd")
+                ])
             ))
         );
 

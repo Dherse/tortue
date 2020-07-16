@@ -5,25 +5,19 @@ use serde::ser::{
     SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
 };
 use std::collections::HashMap;
-pub enum Compound<'se> {
+pub(crate) enum Compound<'se> {
     Map {
-        ser: Serializer<'se>,
         current_key: Option<String>,
         values: HashMap<String, BencodedValue<'se>>,
     },
     Array {
-        ser: Serializer<'se>,
         values: Vec<BencodedValue<'se>>,
     },
 }
 
 impl<'serializer> Compound<'serializer> {
-    pub fn new_array(
-        ser: Serializer<'serializer>,
-        capacity_hint: Option<usize>,
-    ) -> Self {
+    pub fn new_array(capacity_hint: Option<usize>) -> Self {
         Compound::Array {
-            ser,
             values: if let Some(hint) = capacity_hint {
                 Vec::with_capacity(hint)
             } else {
@@ -32,12 +26,8 @@ impl<'serializer> Compound<'serializer> {
         }
     }
 
-    pub fn new_map(
-        ser: Serializer<'serializer>,
-        capacity_hint: Option<usize>,
-    ) -> Self {
+    pub fn new_map(capacity_hint: Option<usize>) -> Self {
         Compound::Map {
-            ser,
             current_key: None,
             values: if let Some(hint) = capacity_hint {
                 HashMap::with_capacity(hint)

@@ -4,16 +4,18 @@ use serde::{de, Deserialize};
 mod map;
 mod seq;
 
-pub struct Deserializer<'data> {
+pub(crate) struct Deserializer<'data> {
     input: BencodedValue<'data>,
 }
 
+/// Deserializes a data structure from an already parsed value
 pub fn from_value<'de, T: Deserialize<'de>>(
     value: BencodedValue<'de>,
 ) -> Result<T, Error> {
     T::deserialize(Deserializer::from_value(value)?)
 }
 
+/// Deserializes a data structure from a slice of bytes
 pub fn from_bytes<'de, T: Deserialize<'de>>(
     data: &'de [u8],
 ) -> Result<T, Error> {
@@ -22,7 +24,7 @@ pub fn from_bytes<'de, T: Deserialize<'de>>(
 
 impl<'data> Deserializer<'data> {
     pub fn new(data: &'data [u8]) -> Result<Self, Error> {
-        Self::from_value(if let Ok(input) = parser::parse(data) {
+        Self::from_value(if let Ok(input) = parser::parse_all(data) {
             input.1
         } else {
             return Err(Error::Message("failed to parse input".to_owned()));
