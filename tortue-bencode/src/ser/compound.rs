@@ -4,59 +4,52 @@ use serde::ser::{
     SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
     SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
 };
-pub enum Compound<'data, 'serializer> {
+use std::collections::HashMap;
+pub enum Compound<'se> {
     Map {
-        ser: &'serializer mut Serializer<'data>,
-        local_serializer: Serializer<'data>,
-        keys: Vec<String>,
+        ser: Serializer<'se>,
+        current_key: Option<String>,
+        values: HashMap<String, BencodedValue<'se>>,
     },
     Array {
-        ser: &'serializer mut Serializer<'data>,
-        local_serializer: Serializer<'data>,
+        ser: Serializer<'se>,
+        values: Vec<BencodedValue<'se>>,
     },
 }
 
-impl<'data, 'serializer> Compound<'data, 'serializer> {
+impl<'serializer> Compound<'serializer> {
     pub fn new_array(
-        ser: &'serializer mut Serializer<'data>,
+        ser: Serializer<'serializer>,
         capacity_hint: Option<usize>,
     ) -> Self {
         Compound::Array {
             ser,
-            local_serializer: Serializer {
-                output: if let Some(hint) = capacity_hint {
-                    Vec::with_capacity(hint)
-                } else {
-                    Vec::new()
-                },
+            values: if let Some(hint) = capacity_hint {
+                Vec::with_capacity(hint)
+            } else {
+                Vec::new()
             },
         }
     }
 
     pub fn new_map(
-        ser: &'serializer mut Serializer<'data>,
+        ser: Serializer<'serializer>,
         capacity_hint: Option<usize>,
     ) -> Self {
         Compound::Map {
             ser,
-            keys: if let Some(hint) = capacity_hint {
-                Vec::with_capacity(hint)
+            current_key: None,
+            values: if let Some(hint) = capacity_hint {
+                HashMap::with_capacity(hint)
             } else {
-                Vec::new()
-            },
-            local_serializer: Serializer {
-                output: if let Some(hint) = capacity_hint {
-                    Vec::with_capacity(hint)
-                } else {
-                    Vec::new()
-                },
+                HashMap::new()
             },
         }
     }
 }
 
-impl<'data, 'serializer> SerializeSeq for Compound<'data, 'serializer> {
-    type Ok = ();
+impl<'serializer> SerializeSeq for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
     fn serialize_element<T: ?Sized>(
         &mut self,
@@ -65,12 +58,9 @@ impl<'data, 'serializer> SerializeSeq for Compound<'data, 'serializer> {
     where
         T: serde::Serialize,
     {
-        match *self {
-            Compound::Array {
-                ref mut local_serializer,
-                ..
-            } => {
-                value.serialize(&mut *local_serializer)?;
+        match self {
+            Compound::Array { values, .. } => {
+                values.push(value.serialize(Serializer::default())?);
             }
             _ => unreachable!(),
         }
@@ -80,23 +70,14 @@ impl<'data, 'serializer> SerializeSeq for Compound<'data, 'serializer> {
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         match self {
-            Compound::Array {
-                ser,
-                local_serializer,
-                ..
-            } => {
-                ser.output
-                    .push(BencodedValue::List(local_serializer.output));
-            }
+            Compound::Array { values, .. } => Ok(BencodedValue::List(values)),
             _ => unreachable!(),
         }
-
-        Ok(())
     }
 }
 
-impl<'data, 'serializer> SerializeTuple for Compound<'data, 'serializer> {
-    type Ok = ();
+impl<'serializer> SerializeTuple for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
 
     fn serialize_element<T: ?Sized>(
@@ -114,8 +95,8 @@ impl<'data, 'serializer> SerializeTuple for Compound<'data, 'serializer> {
     }
 }
 
-impl<'data, 'serializer> SerializeTupleStruct for Compound<'data, 'serializer> {
-    type Ok = ();
+impl<'serializer> SerializeTupleStruct for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(
@@ -133,10 +114,8 @@ impl<'data, 'serializer> SerializeTupleStruct for Compound<'data, 'serializer> {
     }
 }
 
-impl<'data, 'serializer> SerializeTupleVariant
-    for Compound<'data, 'serializer>
-{
-    type Ok = ();
+impl<'serializer> SerializeTupleVariant for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(
@@ -154,8 +133,8 @@ impl<'data, 'serializer> SerializeTupleVariant
     }
 }
 
-impl<'data, 'serializer> SerializeStruct for Compound<'data, 'serializer> {
-    type Ok = ();
+impl<'serializer> SerializeStruct for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(
@@ -167,13 +146,12 @@ impl<'data, 'serializer> SerializeStruct for Compound<'data, 'serializer> {
         T: serde::Serialize,
     {
         match *self {
-            Compound::Map {
-                ref mut local_serializer,
-                ref mut keys,
-                ..
-            } => {
-                keys.push(key.to_owned());
-                value.serialize(&mut *local_serializer)?;
+            Compound::Map { ref mut values, .. } => {
+                //keys.push(key.to_owned());
+                values.insert(
+                    key.to_owned(),
+                    value.serialize(Serializer::default())?,
+                );
             }
             _ => unreachable!(),
         }
@@ -183,26 +161,16 @@ impl<'data, 'serializer> SerializeStruct for Compound<'data, 'serializer> {
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         match self {
-            Compound::Map {
-                ser,
-                local_serializer,
-                keys,
-            } => {
-                ser.output.push(BencodedValue::DictionaryOwned(
-                    keys.into_iter()
-                        .zip(local_serializer.output.into_iter())
-                        .collect(),
-                ));
+            Compound::Map { values, .. } => {
+                Ok(BencodedValue::DictionaryOwned(values))
             }
             _ => unreachable!(),
         }
-
-        Ok(())
     }
 }
 
-impl<'data, 'serializer> SerializeMap for Compound<'data, 'serializer> {
-    type Ok = ();
+impl<'serializer> SerializeMap for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
 
     fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
@@ -211,20 +179,22 @@ impl<'data, 'serializer> SerializeMap for Compound<'data, 'serializer> {
     {
         match *self {
             Compound::Map {
-                ref mut local_serializer,
-                ref mut keys,
+                ref mut current_key,
                 ..
             } => {
-                key.serialize(&mut *local_serializer)?;
-                match local_serializer.output.pop().unwrap() {
-                    BencodedValue::String(value) => keys.push(value.to_owned()),
-                    BencodedValue::StringOwned(value) => keys.push(value),
+                match key.serialize(Serializer::default())? {
+                    BencodedValue::String(value) => {
+                        current_key.replace(value.to_owned())
+                    }
+                    BencodedValue::StringOwned(value) => {
+                        current_key.replace(value)
+                    }
                     _ => {
                         return Err(Error::Message(
                             "Only string keys are supported in maps".to_owned(),
                         ))
                     }
-                }
+                };
             }
             _ => unreachable!(),
         }
@@ -239,13 +209,21 @@ impl<'data, 'serializer> SerializeMap for Compound<'data, 'serializer> {
     where
         T: serde::Serialize,
     {
-        match *self {
+        match self {
             Compound::Map {
-                ref mut local_serializer,
+                current_key,
+                values,
                 ..
-            } => value.serialize(local_serializer),
+            } => {
+                values.insert(
+                    current_key.take().unwrap(),
+                    value.serialize(Serializer::default())?,
+                );
+            }
             _ => unreachable!(),
         }
+
+        Ok(())
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
@@ -253,10 +231,8 @@ impl<'data, 'serializer> SerializeMap for Compound<'data, 'serializer> {
     }
 }
 
-impl<'data, 'serializer> SerializeStructVariant
-    for Compound<'data, 'serializer>
-{
-    type Ok = ();
+impl<'serializer> SerializeStructVariant for Compound<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
 
     fn serialize_field<T: ?Sized>(

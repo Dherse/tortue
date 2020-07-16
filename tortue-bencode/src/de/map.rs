@@ -1,11 +1,11 @@
 use crate::{error::Error, BencodedValue};
 use serde::de;
-use std::collections::HashMap;
+use std::collections::{hash_map::IntoIter, HashMap};
 
 pub struct MapAccess<'re> {
     len: usize,
     index: usize,
-    values: Vec<(String, BencodedValue<'re>)>,
+    values: IntoIter<String, BencodedValue<'re>>,
     current_value: Option<BencodedValue<'re>>,
 }
 
@@ -14,7 +14,7 @@ impl<'re> MapAccess<'re> {
         MapAccess {
             index: 0,
             len: values.len(),
-            values: values.into_iter().collect(),
+            values: values.into_iter(),
             current_value: None,
         }
     }
@@ -37,15 +37,14 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
                 self.index += 1;
             }
 
-            let (key, value) = self.values.remove(0);
+            let (key, value) = self.values.next().unwrap();
 
             self.current_value = Some(value);
 
-            let mut deser = super::Deserializer::from_value(
+            let deser = super::Deserializer::from_value(
                 BencodedValue::StringOwned(key),
             )?;
-            let out = seed.deserialize(&mut deser)
-                .map(Some)?;
+            let out = seed.deserialize(deser).map(Some)?;
 
             Ok(out)
         }
@@ -59,10 +58,10 @@ impl<'de> de::MapAccess<'de> for MapAccess<'de> {
             panic!("overflow")
         } else {
             self.index += 1;
-            let mut deser = super::Deserializer::from_value(
+            let deser = super::Deserializer::from_value(
                 self.current_value.take().unwrap(),
             )?;
-            seed.deserialize(&mut deser)
+            seed.deserialize(deser)
         }
     }
 }

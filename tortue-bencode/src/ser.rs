@@ -6,14 +6,14 @@ use compound::Compound;
 use serde::{ser, Serialize};
 use std::{
     io::{self, Write},
+    marker::PhantomData,
     mem::size_of,
 };
 
 mod compound;
 
-pub struct Serializer<'data> {
-    output: Vec<BencodedValue<'data>>,
-}
+#[derive(Default)]
+pub struct Serializer<'se>(PhantomData<BencodedValue<'se>>);
 
 pub fn to_bytes<T>(value: &T) -> std::result::Result<Vec<u8>, io::Error>
 where
@@ -36,40 +36,29 @@ where
 }
 
 pub fn to_value<'a, T>(
-    value: &T,
+    value: &'a T,
 ) -> std::result::Result<BencodedValue<'a>, io::Error>
 where
     T: Serialize,
 {
-    let mut serializer = Serializer { output: Vec::new() };
-
     value
-        .serialize(&mut serializer)
-        .map_err(Into::<io::Error>::into)?;
-
-    Ok(if serializer.output.len() == 1 {
-        serializer.output.pop().unwrap()
-    } else {
-        BencodedValue::List(serializer.output)
-    })
+        .serialize(Serializer::default())
+        .map_err(Into::<io::Error>::into)
 }
 
-impl<'data, 'serializer> ser::Serializer
-    for &'serializer mut Serializer<'data>
-{
-    type Ok = ();
+impl<'serializer> ser::Serializer for Serializer<'serializer> {
+    type Ok = BencodedValue<'serializer>;
     type Error = Error;
-    type SerializeSeq = Compound<'data, 'serializer>;
-    type SerializeTuple = Compound<'data, 'serializer>;
-    type SerializeTupleStruct = Compound<'data, 'serializer>;
-    type SerializeTupleVariant = Compound<'data, 'serializer>;
-    type SerializeMap = Compound<'data, 'serializer>;
-    type SerializeStruct = Compound<'data, 'serializer>;
-    type SerializeStructVariant = Compound<'data, 'serializer>;
+    type SerializeSeq = Compound<'serializer>;
+    type SerializeTuple = Compound<'serializer>;
+    type SerializeTupleStruct = Compound<'serializer>;
+    type SerializeTupleVariant = Compound<'serializer>;
+    type SerializeMap = Compound<'serializer>;
+    type SerializeStruct = Compound<'serializer>;
+    type SerializeStructVariant = Compound<'serializer>;
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok> {
-        self.output.push(BencodedValue::Integer(v));
-        Ok(())
+        Ok(BencodedValue::Integer(v))
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok> {
@@ -81,17 +70,15 @@ impl<'data, 'serializer> ser::Serializer
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
-        self.output.push(BencodedValue::StringOwned(v.to_owned()));
-        Ok(())
+        Ok(BencodedValue::StringOwned(v.to_owned()))
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {
-        self.output.push(BencodedValue::BinaryOwned(v.to_vec()));
-        Ok(())
+        Ok(BencodedValue::BinaryOwned(v.to_vec()))
     }
 
     fn serialize_none(self) -> Result<Self::Ok> {
-        Ok(())
+        Ok(BencodedValue::None)
     }
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok> {
@@ -196,13 +183,9 @@ impl<'data, 'serializer> ser::Serializer
     where
         T: Serialize,
     {
-        let mut serializer = Serializer { output: vec![] };
-        value.serialize(&mut serializer)?;
-        self.output
-            .push(BencodedValue::Dictionary(maplit::hashmap! {
-                variant => serializer.output.pop().unwrap()
-            }));
-        Ok(())
+        Ok(BencodedValue::Dictionary(maplit::hashmap! {
+            variant => value.serialize(self)?
+        }))
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {

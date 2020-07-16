@@ -1,6 +1,5 @@
 use crate::{error::Error, parser, BencodedValue};
 use serde::{de, Deserialize};
-use std::mem::{self, swap};
 
 mod map;
 mod seq;
@@ -12,13 +11,13 @@ pub struct Deserializer<'data> {
 pub fn from_value<'de, T: Deserialize<'de>>(
     value: BencodedValue<'de>,
 ) -> Result<T, Error> {
-    T::deserialize(&mut Deserializer::from_value(value)?)
+    T::deserialize(Deserializer::from_value(value)?)
 }
 
 pub fn from_bytes<'de, T: Deserialize<'de>>(
     data: &'de [u8],
 ) -> Result<T, Error> {
-    T::deserialize(&mut Deserializer::new(data)?)
+    T::deserialize(Deserializer::new(data)?)
 }
 
 impl<'data> Deserializer<'data> {
@@ -29,11 +28,12 @@ impl<'data> Deserializer<'data> {
             return Err(Error::Message("failed to parse input".to_owned()));
         })
     }
+
     pub fn from_value(input: BencodedValue<'data>) -> Result<Self, Error> {
         Ok(Deserializer { input })
     }
 
-    pub fn parse_bool(&self) -> Result<bool, Error> {
+    pub fn parse_bool(self) -> Result<bool, Error> {
         match &self.input {
             BencodedValue::Integer(value) => match value {
                 1 => Ok(true),
@@ -49,9 +49,9 @@ impl<'data> Deserializer<'data> {
         }
     }
 
-    pub fn parse_int(&self) -> Result<i64, Error> {
-        match &self.input {
-            BencodedValue::Integer(value) => Ok(*value),
+    pub fn parse_int(self) -> Result<i64, Error> {
+        match self.input {
+            BencodedValue::Integer(value) => Ok(value),
             v => Err(Error::Message(format!(
                 "cannot convert from {:?} to int",
                 v
@@ -59,7 +59,7 @@ impl<'data> Deserializer<'data> {
         }
     }
 
-    pub fn parse_uint(&self) -> Result<u64, Error> {
+    pub fn parse_uint(self) -> Result<u64, Error> {
         let value = self.parse_int()?;
         if value < 0 {
             Err(Error::Message("uint cannot be negative".to_owned()))
@@ -68,12 +68,12 @@ impl<'data> Deserializer<'data> {
         }
     }
 
-    pub fn parse_float(&self) -> Result<f64, Error> {
+    pub fn parse_float(self) -> Result<f64, Error> {
         Ok(self.parse_int()? as i32 as _)
     }
 
-    pub fn parse_char(&self) -> Result<char, Error> {
-        match &self.input {
+    pub fn parse_char(self) -> Result<char, Error> {
+        match self.input {
             BencodedValue::String(value) => {
                 if value.len() == 1 {
                     Ok(value.chars().next().unwrap())
@@ -99,52 +99,52 @@ impl<'data> Deserializer<'data> {
         }
     }
 
-    pub fn parse_str(&self) -> Result<&str, Error> {
-        match &self.input {
+    pub fn parse_str(self) -> Result<&'data str, Error> {
+        match self.input {
             BencodedValue::String(value) => Ok(value),
-            BencodedValue::StringOwned(value) => Ok(value),
+            //BencodedValue::StringOwned(value) => Ok(&value),
             v => Err(Error::Message(format!(
-                "cannot convert from {:?} to char",
+                "cannot convert from {:?} to str",
                 v
             ))),
         }
     }
 
-    pub fn parse_string(&self) -> Result<String, Error> {
+    pub fn parse_string(self) -> Result<String, Error> {
         match &self.input {
             BencodedValue::String(value) => Ok((*value).to_owned()),
             BencodedValue::StringOwned(value) => Ok(value.clone()),
             v => Err(Error::Message(format!(
-                "cannot convert from {:?} to char",
+                "cannot convert from {:?} to string",
                 v
             ))),
         }
     }
 
-    pub fn parse_bytes(&self) -> Result<&[u8], Error> {
-        match &self.input {
+    pub fn parse_bytes(self) -> Result<&'data [u8], Error> {
+        match self.input {
             BencodedValue::Binary(value) => Ok(value),
+            //BencodedValue::BinaryOwned(value) => Ok(&value[..]),
+            v => Err(Error::Message(format!(
+                "cannot convert from {:?} to bytes",
+                v
+            ))),
+        }
+    }
+
+    pub fn parse_bytes_owned(self) -> Result<Vec<u8>, Error> {
+        match self.input {
+            BencodedValue::Binary(value) => Ok(value.to_vec()),
             BencodedValue::BinaryOwned(value) => Ok(value),
             v => Err(Error::Message(format!(
-                "cannot convert from {:?} to char",
-                v
-            ))),
-        }
-    }
-
-    pub fn parse_bytes_owned(&self) -> Result<Vec<u8>, Error> {
-        match &self.input {
-            BencodedValue::Binary(value) => Ok(value.to_vec()),
-            BencodedValue::BinaryOwned(value) => Ok(value.clone()),
-            v => Err(Error::Message(format!(
-                "cannot convert from {:?} to char",
+                "cannot convert from {:?} to owned bytes",
                 v
             ))),
         }
     }
 }
 
-impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
+impl<'de> de::Deserializer<'de> for Deserializer<'de> {
     type Error = Error;
 
     fn is_human_readable(&self) -> bool {
@@ -256,7 +256,11 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_str(self.parse_str()?)
+        if self.input.is_owned() {
+            visitor.visit_string(self.parse_string()?)
+        } else {
+            visitor.visit_borrowed_str(self.parse_str()?)
+        }
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -270,7 +274,11 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_bytes(self.parse_bytes()?)
+        if self.input.is_owned() {
+            visitor.visit_byte_buf(self.parse_bytes_owned()?)
+        } else {
+            visitor.visit_borrowed_bytes(self.parse_bytes()?)
+        }
     }
 
     fn deserialize_byte_buf<V>(
@@ -282,6 +290,7 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
     {
         visitor.visit_byte_buf(self.parse_bytes_owned()?)
     }
+
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -326,14 +335,17 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         if self.input.is_list() {
-            let list = mem::take(&mut self.input).unwrap_list();
+            let list = self.input.unwrap_list();
 
             visitor.visit_seq(seq::SeqAccess::new(list))
         } else if self.input.is_bin() {
-            let mut value = BencodedValue::None;
-            swap(&mut self.input, &mut value);
-
-            visitor.visit_byte_buf(value.unwrap_bin())
+            visitor.visit_seq(seq::SeqAccess::new(
+                self.input
+                    .unwrap_bin()
+                    .into_iter()
+                    .map(|e| BencodedValue::Integer(e as _))
+                    .collect(),
+            ))
         } else {
             Err(Error::Message(format!(
                 "cannot convert from {:?} to list",
@@ -370,7 +382,7 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         if self.input.is_dict() {
-            let map = mem::take(&mut self.input).unwrap_dict();
+            let map = self.input.unwrap_dict();
 
             visitor.visit_map(map::MapAccess::new(map))
         } else {
@@ -425,7 +437,7 @@ impl<'de, 're> de::Deserializer<'de> for &'re mut Deserializer<'de> {
     }
 
     fn deserialize_ignored_any<V>(
-        self,
+        mut self,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where

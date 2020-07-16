@@ -51,6 +51,15 @@ impl<'a> Default for BencodedValue<'a> {
 }
 
 impl<'a> BencodedValue<'a> {
+    pub fn is_owned(&self) -> bool {
+        match self {
+            BencodedValue::BinaryOwned(_)
+            | BencodedValue::StringOwned(_)
+            | BencodedValue::DictionaryOwned(_)
+            | BencodedValue::None => true,
+            _ => false,
+        }
+    }
     pub fn is_bin(&self) -> bool {
         match self {
             BencodedValue::Binary(_) | BencodedValue::BinaryOwned(_) => true,

@@ -7,56 +7,57 @@ use tortue_bencode::{from_bytes, parser::parse};
 const DATA: &[u8] = include_bytes!("test_data");
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct Profile {
-    acodec: String,
+struct Profile<'a> {
+    acodec: &'a str,
     height: i64,
-    vcodec: String,
+    vcodec: &'a str,
     width: i64,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct Info {
+struct Info<'a> {
     #[serde(rename = "file-duration")]
     file_duration: Vec<i64>,
 
-    #[serde(rename = "file media")]
+    #[serde(rename = "file-media")]
     file_media: Vec<i64>,
 
     length: i64,
 
-    name: String,
+    name: &'a str,
 
     #[serde(rename = "piece length")]
     piece_length: i64,
 
-    pieces: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pieces: &'a [u8],
 
-    profiles: Vec<Profile>,
+    profiles: Vec<Profile<'a>>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct Data {
-    announce: String,
+struct Data<'a> {
+    announce: &'a str,
 
     #[serde(rename = "announce-list")]
-    announce_list: Vec<Vec<String>>,
+    announce_list: Vec<Vec<&'a str>>,
 
-    comment: String,
+    comment: &'a str,
 
     #[serde(rename = "created by")]
-    created_by: String,
+    created_by: &'a str,
 
     #[serde(rename = "creation date")]
     creation_date: i64,
 
-    encoding: String,
+    encoding: &'a str,
 
-    #[serde(rename = "url list")]
-    url_list: Vec<String>,
+    #[serde(rename = "url-list")]
+    url_list: Vec<&'a str>,
 
-    website: String,
+    website: &'a str,
 
-    info: Info,
+    info: Info<'a>,
 }
 
 pub fn throughput_benchmark(c: &mut Criterion) {
