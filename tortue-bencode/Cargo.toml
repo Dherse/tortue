@@ -1,0 +1,25 @@
+[package]
+name = "tortue-bencode"
+version = "0.1.0"
+authors = ["Dherse <sebastien.dherbais@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1", features = [ "derive" ] }
+nom = "5.1.2"
+maplit = "1.0.2"
+
+[dev-dependencies]
+criterion = "0.3.3"
+
+[[bench]]
+path = "benches/parser_bench.rs"
+name = "parser_bench"
+harness = false
+
+[[bench]]
+path = "benches/writer_bench.rs"
+name = "writer_bench"
+harness = false
