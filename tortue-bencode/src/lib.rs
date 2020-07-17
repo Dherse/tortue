@@ -8,7 +8,7 @@
 
 use std::{
     collections::HashMap,
-    fmt::{self, Debug},
+    fmt,
 };
 
 pub mod parser;

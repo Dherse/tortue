@@ -72,33 +72,52 @@ pub enum Info<'a> {
 
     /// The torrent contains multiple files
     MultiFile {
+        /// Number of bytes in each piece
         #[serde(rename = "piece length")]
         piece_length: i64,
 
+        /// 20 bytes SHA-1 hash value, one per piece
         #[serde(with = "serde_bytes")]
         pieces: &'a [u8],
 
+        /// if `Some(true)` the client MUST publish its presence to get other
+        /// peers ONLY via the trackers explicitly described in the metainfo file.
+        /// If this field is set to None or Some(false), the client may obtain peer
+        /// from other means, e.g. PEX peer exchange, dht. Here, "private" may be
+        /// read as "no external peer source".
         private: Option<bool>,
 
+        /// Directory name containing the files
         #[serde(rename = "name")]
         dir_name: &'a str,
 
+        /// List of files in the torrent
         files: Vec<FileInfo<'a>>,
     },
 }
+/// This is the section of the metainfo file that contains information about a file
+/// being transferred
+///
+/// **⚠ Note that this uses a lifetime to do zero copy deserialization**
+///
+/// [source](https://wiki.theory.org/index.php/BitTorrentSpecification#Identification)
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct FileInfo<'a> {
+    /// Name of the file
     #[serde(rename = "name")]
-    file_name: &'a str,
+    pub file_name: &'a str,
 
+    /// Size (in bytes) of the file
     #[serde(rename = "length")]
-    file_size: i64,
+    pub file_size: i64,
 
+    /// md5 checksum of the file (optional)
     #[serde(with = "serde_bytes")]
-    md5sum: Option<&'a [u8]>,
+    pub md5sum: Option<&'a [u8]>,
 }
 
 impl<'a> Info<'a> {
+    /// Is the transfer containing a single file?
     pub fn is_single_file(&self) -> bool {
         match self {
             Info::SingleFile { .. } => true,
@@ -106,6 +125,7 @@ impl<'a> Info<'a> {
         }
     }
 
+    /// Is the transfer containing multiple files?
     pub fn is_multi_file(&self) -> bool {
         !self.is_single_file()
     }
@@ -235,7 +255,15 @@ impl<'de> Visitor<'de> for FileInfoVisitor {
             return Err(Error::missing_field("pieces length"));
         }
 
-        if files.is_none() {
+        if let Some(files) = files {
+            Ok(Info::MultiFile {
+                piece_length: pieces_length.unwrap(),
+                pieces: pieces.unwrap(),
+                private,
+                dir_name: name.unwrap(),
+                files,
+            })
+        } else {
             if files_size.is_none() {
                 return Err(Error::missing_field("length"));
             }
@@ -249,14 +277,6 @@ impl<'de> Visitor<'de> for FileInfoVisitor {
                     file_size: files_size.unwrap(),
                     md5sum,
                 },
-            })
-        } else {
-            Ok(Info::MultiFile {
-                piece_length: pieces_length.unwrap(),
-                pieces: pieces.unwrap(),
-                private,
-                dir_name: name.unwrap(),
-                files: files.unwrap(),
             })
         }
     }
