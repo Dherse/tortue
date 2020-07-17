@@ -1,24 +1,19 @@
 [package]
-name = "tortue-bencode"
+name = "tortue-structs"
 version = "0.1.0"
 authors = ["Dherse <sebastien.dherbais@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+tortue-bencode = { path = "../tortue-bencode" }
+
 serde = { version = "1", features = [ "derive" ] }
-nom = "5.1.2"
-maplit = "1.0.2"
+serde_bytes = "0.11.5"
 
 [dev-dependencies]
 criterion = "0.3.3"
-serde_bytes = "0.11"
 
 [[bench]]
-path = "benches/parser_bench.rs"
-name = "parser_bench"
-harness = false
-
-[[bench]]
-path = "benches/writer_bench.rs"
-name = "writer_bench"
+path = "benches/read_bench.rs"
+name = "read_bench"
 harness = false

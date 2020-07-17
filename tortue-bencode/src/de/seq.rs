@@ -31,7 +31,7 @@ impl<'de> de::SeqAccess<'de> for SeqAccess<'de> {
             Ok(None)
         } else {
             self.index += 1;
-            let deser = super::Deserializer::from_value(self.values.remove(0))?;
+            let deser = super::Deserializer::from_value(self.values.remove(0));
             let out = seed.deserialize(deser).map(Some)?;
 
             Ok(out)

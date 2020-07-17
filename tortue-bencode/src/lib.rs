@@ -1,4 +1,15 @@
-use std::collections::HashMap;
+//! Parser, Serialize and Deserializer for bencode
+//!
+//! Written in pure rust, should be plenty fast for any torrent related use
+//!
+//! ⚠ Note that tupple struct, and enums are supported in serialization but require
+//!   deserialization code as there is no way in bincode to encode the variant used.
+//!
+
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+};
 
 pub mod parser;
 pub mod writer;
@@ -20,7 +31,7 @@ use serde::{
 ///
 /// This value implements Serialize and Deserialized, this is useful if you are writing data
 /// structure that can contain "any" bencoded value as you can just make the field BencodedValue<'a>
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum BencodedValue<'a> {
     /// A binary array, this is a convinience method at binary data is stored in string-like
     /// fiels inside of the data
@@ -51,6 +62,57 @@ pub enum BencodedValue<'a> {
     /// An empty value. Note that this does **not** exist in bencode, it is used
     /// as a helper value internally to represent empty values and Option::None.
     None,
+}
+impl<'a> fmt::Debug for BencodedValue<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match (&*self,) {
+            (&BencodedValue::Binary(ref bin_value),) => f
+                .debug_struct("Binary")
+                .field("length", &bin_value.len())
+                .finish(),
+            (&BencodedValue::BinaryOwned(ref bin_value),) => f
+                .debug_struct("BinaryOwned")
+                .field("length", &bin_value.len())
+                .finish(),
+            (&BencodedValue::String(ref str),) => {
+                f.debug_tuple("String").field(str).finish()
+            }
+            (&BencodedValue::StringOwned(ref str),) => {
+                f.debug_tuple("StringOwned").field(str).finish()
+            }
+            (&BencodedValue::Integer(ref int),) => {
+                f.debug_tuple("Integer").field(int).finish()
+            }
+            (&BencodedValue::List(ref list),) => {
+                if list.len() > 32 {
+                    f.debug_struct("List")
+                        .field("length", &list.len())
+                        .finish()
+                } else {
+                    f.debug_tuple("List").field(list).finish()
+                }
+            }
+            (&BencodedValue::Dictionary(ref dict),) => {
+                if dict.len() > 32 {
+                    f.debug_struct("Dictionary")
+                        .field("length", &dict.len())
+                        .finish()
+                } else {
+                    f.debug_tuple("Dictionary").field(dict).finish()
+                }
+            }
+            (&BencodedValue::DictionaryOwned(ref dict),) => {
+                if dict.len() > 32 {
+                    f.debug_struct("DictionaryOwned")
+                        .field("length", &dict.len())
+                        .finish()
+                } else {
+                    f.debug_tuple("DictionaryOwned").field(dict).finish()
+                }
+            }
+            (&BencodedValue::None,) => f.debug_tuple("None").finish(),
+        }
+    }
 }
 
 impl<'a> Default for BencodedValue<'a> {

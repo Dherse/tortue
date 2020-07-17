@@ -4,7 +4,7 @@ use serde::{de, Deserialize};
 mod map;
 mod seq;
 
-pub(crate) struct Deserializer<'data> {
+pub struct Deserializer<'data> {
     input: BencodedValue<'data>,
 }
 
@@ -12,7 +12,7 @@ pub(crate) struct Deserializer<'data> {
 pub fn from_value<'de, T: Deserialize<'de>>(
     value: BencodedValue<'de>,
 ) -> Result<T, Error> {
-    T::deserialize(Deserializer::from_value(value)?)
+    T::deserialize(Deserializer::from_value(value))
 }
 
 /// Deserializes a data structure from a slice of bytes
@@ -24,15 +24,16 @@ pub fn from_bytes<'de, T: Deserialize<'de>>(
 
 impl<'data> Deserializer<'data> {
     pub fn new(data: &'data [u8]) -> Result<Self, Error> {
-        Self::from_value(if let Ok(input) = parser::parse_all(data) {
-            input.1
-        } else {
-            return Err(Error::Message("failed to parse input".to_owned()));
-        })
+        Ok(Self::from_value(match parser::parse_all(data) {
+            Ok(input) => input.1,
+            Err(e) => {
+                return Err(Error::Message(format!("parse error: {:?}", e)));
+            }
+        }))
     }
 
-    pub fn from_value(input: BencodedValue<'data>) -> Result<Self, Error> {
-        Ok(Deserializer { input })
+    pub fn from_value(input: BencodedValue<'data>) -> Self {
+        Deserializer { input }
     }
 
     pub fn parse_bool(self) -> Result<bool, Error> {
@@ -126,6 +127,7 @@ impl<'data> Deserializer<'data> {
     pub fn parse_bytes(self) -> Result<&'data [u8], Error> {
         match self.input {
             BencodedValue::Binary(value) => Ok(value),
+            BencodedValue::String(value) => Ok(value.as_bytes()),
             //BencodedValue::BinaryOwned(value) => Ok(&value[..]),
             v => Err(Error::Message(format!(
                 "cannot convert from {:?} to bytes",
@@ -138,6 +140,8 @@ impl<'data> Deserializer<'data> {
         match self.input {
             BencodedValue::Binary(value) => Ok(value.to_vec()),
             BencodedValue::BinaryOwned(value) => Ok(value),
+            BencodedValue::String(value) => Ok(value.bytes().collect()),
+            BencodedValue::StringOwned(value) => Ok(value.bytes().collect()),
             v => Err(Error::Message(format!(
                 "cannot convert from {:?} to owned bytes",
                 v
@@ -158,8 +162,8 @@ impl<'de> de::Deserializer<'de> for Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         match &self.input {
-            BencodedValue::Binary(_) => self.deserialize_seq(visitor),
-            BencodedValue::BinaryOwned(_) => self.deserialize_seq(visitor),
+            BencodedValue::Binary(_) => self.deserialize_bytes(visitor),
+            BencodedValue::BinaryOwned(_) => self.deserialize_byte_buf(visitor),
             BencodedValue::String(_) => self.deserialize_str(visitor),
             BencodedValue::StringOwned(_) => self.deserialize_str(visitor),
             BencodedValue::Integer(_) => self.deserialize_i64(visitor),
@@ -384,12 +388,18 @@ impl<'de> de::Deserializer<'de> for Deserializer<'de> {
         V: de::Visitor<'de>,
     {
         if self.input.is_dict() {
-            let map = self.input.unwrap_dict();
-
-            visitor.visit_map(map::MapAccess::new(map))
+            match self.input {
+                BencodedValue::Dictionary(dict) => {
+                    visitor.visit_map(map::MapAccess::new(dict))
+                }
+                BencodedValue::DictionaryOwned(dict) => {
+                    visitor.visit_map(map::MapAccess::new(dict))
+                }
+                _ => unreachable!(),
+            }
         } else {
             Err(Error::Message(format!(
-                "cannot convert from {:?} to list",
+                "cannot convert from {:?} to dictionary",
                 self.input
             )))
         }

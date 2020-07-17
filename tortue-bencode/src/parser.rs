@@ -21,11 +21,11 @@ pub use crate::BencodedValue;
 #[inline]
 pub fn parse<'a>(input: &'a [u8]) -> IResult<&'a [u8], BencodedValue<'a>> {
     alt((
+        map(string::parse_string, BencodedValue::String),
+        map(bytes::parse_bytes, BencodedValue::Binary),
         map(int::parse_int, BencodedValue::Integer),
         list::parse_list,
         map(dictionary::parse_dictionary, BencodedValue::Dictionary),
-        map(string::parse_string, BencodedValue::String),
-        map(bytes::parse_bytes, BencodedValue::Binary),
     ))(input)
 }
 

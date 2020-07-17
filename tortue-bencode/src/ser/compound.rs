@@ -110,16 +110,16 @@ impl<'serializer> SerializeTupleVariant for Compound<'serializer> {
 
     fn serialize_field<T: ?Sized>(
         &mut self,
-        _value: &T,
+        value: &T,
     ) -> Result<(), Self::Error>
     where
         T: serde::Serialize,
     {
-        Err(Error::Message("Enum variants are not supported".to_owned()))
+        <Self as SerializeSeq>::serialize_element(self, value)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Err(Error::Message("Enum variants are not supported".to_owned()))
+        <Self as SerializeSeq>::end(self)
     }
 }
 
@@ -227,16 +227,16 @@ impl<'serializer> SerializeStructVariant for Compound<'serializer> {
 
     fn serialize_field<T: ?Sized>(
         &mut self,
-        _key: &'static str,
-        _value: &T,
+        key: &'static str,
+        value: &T,
     ) -> Result<(), Self::Error>
     where
         T: serde::Serialize,
     {
-        Err(Error::Message("Enum variants are not supported".to_owned()))
+        <Self as SerializeStruct>::serialize_field(self, key, value)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Err(Error::Message("Enum variants are not supported".to_owned()))
+        <Self as SerializeStruct>::end(self)
     }
 }
