@@ -140,12 +140,12 @@ mod parse_tests {
 
         assert_eq!(
             parse(b"i3"),
-            Err(Error((b"i3" as _, ErrorKind::TakeWhileMN)))
+            Err(Error((b"i3" as _, ErrorKind::Char)))
         );
 
         assert_eq!(
             parse(b"ie"),
-            Err(Error((b"ie" as _, ErrorKind::TakeWhileMN)))
+            Err(Error((b"ie" as _, ErrorKind::Char)))
         );
     }
 
@@ -172,11 +172,11 @@ mod parse_tests {
 
         assert_eq!(
             parse(b"e:"),
-            Err(Error((b"e:" as _, ErrorKind::TakeWhileMN)))
+            Err(Error((b"e:" as _, ErrorKind::Char)))
         );
 
         // This is actually parsed by string/bytes
-        assert_eq!(parse(b"3abcd"), Err(Error((b"abcd" as _, ErrorKind::Tag))));
+        assert_eq!(parse(b"3abcd"), Err(Error((b"3abcd" as _, ErrorKind::Char))));
 
         assert_eq!(parse(b"3:ab"), Err(Incomplete(Needed::Size(4))));
     }

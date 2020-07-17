@@ -130,6 +130,10 @@ impl<'a> PartialEq for BencodedValue<'a> {
                 str1 == str2
             }
 
+            (BencodedValue::StringOwned(str1), BencodedValue::StringOwned(str2)) => {
+                str1 == str2
+            }
+
             (BencodedValue::Integer(int1), BencodedValue::Integer(int2)) => {
                 int1 == int2
             }
