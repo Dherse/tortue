@@ -72,7 +72,7 @@ impl<'a> PartialEq for BencodedValue<'a> {
             }
 
             (BencodedValue::Binary(bin1), BencodedValue::BinaryOwned(bin2)) => {
-                bin1 == bin2
+                bin2 == bin1
             }
 
             (BencodedValue::BinaryOwned(bin1), BencodedValue::Binary(bin2)) => {
