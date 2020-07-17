@@ -4,10 +4,14 @@ version = "0.1.0"
 authors = ["Dherse <sebastien.dherbais@gmail.com>"]
 edition = "2018"
 
+[profile.release]
+debug = true
+
 [dependencies]
 serde = { version = "1", features = [ "derive" ] }
 nom = "5.1.2"
 maplit = "1.0.2"
+arbitrary = { version = "0.4.5", optional = true, features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.3.3"

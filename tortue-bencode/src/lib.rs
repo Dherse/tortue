@@ -6,10 +6,7 @@
 //!   deserialization code as there is no way in bincode to encode the variant used.
 //!
 
-use std::{
-    collections::HashMap,
-    fmt,
-};
+use std::{collections::HashMap, fmt};
 
 pub mod parser;
 pub mod writer;
@@ -27,11 +24,14 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
+#[cfg(feature = "arbitrary")]
+use arbitrary::Unstructured;
+
 /// A bencoded value that has been parsed
 ///
 /// This value implements Serialize and Deserialized, this is useful if you are writing data
 /// structure that can contain "any" bencoded value as you can just make the field BencodedValue<'a>
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq)]
 pub enum BencodedValue<'a> {
     /// A binary array, this is a convinience method at binary data is stored in string-like
     /// fiels inside of the data
@@ -63,6 +63,144 @@ pub enum BencodedValue<'a> {
     /// as a helper value internally to represent empty values and Option::None.
     None,
 }
+
+impl<'a> PartialEq for BencodedValue<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (BencodedValue::Binary(bin1), BencodedValue::Binary(bin2)) => {
+                bin1 == bin2
+            }
+
+            (BencodedValue::Binary(bin1), BencodedValue::BinaryOwned(bin2)) => {
+                bin1 == bin2
+            }
+
+            (BencodedValue::BinaryOwned(bin1), BencodedValue::Binary(bin2)) => {
+                bin1 == bin2
+            }
+
+            (
+                BencodedValue::BinaryOwned(bin1),
+                BencodedValue::BinaryOwned(bin2),
+            ) => bin1 == bin2,
+
+            (BencodedValue::Binary(bin), BencodedValue::String(str)) => {
+                *bin == str.as_bytes()
+            }
+
+            (BencodedValue::BinaryOwned(bin), BencodedValue::String(str)) => {
+                *bin == str.as_bytes()
+            }
+
+            (BencodedValue::Binary(bin), BencodedValue::StringOwned(str)) => {
+                *bin == str.as_bytes()
+            }
+
+            (
+                BencodedValue::BinaryOwned(bin),
+                BencodedValue::StringOwned(str),
+            ) => *bin == str.as_bytes(),
+
+            (BencodedValue::String(str), BencodedValue::Binary(bin)) => {
+                *bin == str.as_bytes()
+            }
+
+            (BencodedValue::String(str), BencodedValue::BinaryOwned(bin)) => {
+                *bin == str.as_bytes()
+            }
+
+            (BencodedValue::StringOwned(str), BencodedValue::Binary(bin)) => {
+                *bin == str.as_bytes()
+            }
+
+            (
+                BencodedValue::StringOwned(str),
+                BencodedValue::BinaryOwned(bin),
+            ) => *bin == str.as_bytes(),
+
+            (BencodedValue::String(str1), BencodedValue::String(str2)) => {
+                str1 == str2
+            }
+
+            (BencodedValue::StringOwned(str1), BencodedValue::String(str2)) => {
+                str1 == str2
+            }
+
+            (BencodedValue::String(str1), BencodedValue::StringOwned(str2)) => {
+                str1 == str2
+            }
+
+            (BencodedValue::Integer(int1), BencodedValue::Integer(int2)) => {
+                int1 == int2
+            }
+
+            (BencodedValue::List(list1), BencodedValue::List(list2)) => {
+                list1 == list2
+            }
+
+            (
+                BencodedValue::Dictionary(dict1),
+                BencodedValue::Dictionary(dict2),
+            ) => dict1 == dict2,
+
+            (
+                BencodedValue::DictionaryOwned(dict1),
+                BencodedValue::DictionaryOwned(dict2),
+            ) => dict1 == dict2,
+
+            (
+                BencodedValue::DictionaryOwned(dict1),
+                BencodedValue::Dictionary(dict2),
+            ) => !dict1
+                .iter()
+                .any(|(k1, v1)| dict2.get(k1 as &str) != Some(v1)),
+
+            (
+                BencodedValue::Dictionary(dict1),
+                BencodedValue::DictionaryOwned(dict2),
+            ) => !dict1
+                    .iter()
+                    .any(|(k1, v1)| dict2.get(*k1) != Some(v1)),
+
+            _ => false,
+        }
+    }
+}
+
+
+#[cfg(feature = "arbitrary")]
+impl arbitrary::Arbitrary for BencodedValue<'static> {
+    fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self, arbitrary::Error> {
+        Ok(match u.int_in_range(0..=4)? {
+            0 => {
+                let mut buffer = Vec::<u8>::new();
+                u.fill_buffer(&mut buffer)?;
+
+                BencodedValue::BinaryOwned(buffer)
+            }
+            1 => BencodedValue::StringOwned(u.arbitrary::<String>()?),
+            2 => BencodedValue::Integer(u.arbitrary()?),
+            3 => BencodedValue::List(
+                u.arbitrary_iter()?
+                    .collect::<Result<Vec<BencodedValue<'static>>, _>>()?
+            ),
+            4 => {
+                let len = u.arbitrary_len::<(String, BencodedValue)>()? / 2;
+                let keys = (0..len)
+                    .map(|_| u.arbitrary::<String>())
+                    .collect::<Result<Vec<_>, _>>()?;
+                let values = (0..len)
+                    .map(|_| u.arbitrary::<BencodedValue>()).collect::<Result<Vec<_>, _>>()?;
+
+                BencodedValue::DictionaryOwned(
+                    keys.into_iter().zip(values.into_iter()).collect(),
+                )
+            }
+            _ => unreachable!(),
+        })
+    }
+}
+
 impl<'a> fmt::Debug for BencodedValue<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match (&*self,) {
@@ -85,9 +223,7 @@ impl<'a> fmt::Debug for BencodedValue<'a> {
             }
             (&BencodedValue::List(ref list),) => {
                 if list.len() > 32 {
-                    f.debug_struct("List")
-                        .field("length", &list.len())
-                        .finish()
+                    f.debug_struct("List").field("length", &list.len()).finish()
                 } else {
                     f.debug_tuple("List").field(list).finish()
                 }
