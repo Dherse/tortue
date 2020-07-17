@@ -32,4 +32,8 @@ jobs:
     - name: Bench
       run: cargo bench
       working-directory: tortue-bencode
+    - name: Install Fuzz
+      run: cargo install carg-fuzz
+    - name: Fuzz
+      run: cargo fuzz run random_write
       
