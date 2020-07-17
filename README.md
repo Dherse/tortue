@@ -1,4 +1,5 @@
 # Tortue
+![Rust](https://github.com/Dherse/tortue/workflows/Rust/badge.svg)
 
 A rusty torrent client built for speed and security.
 
