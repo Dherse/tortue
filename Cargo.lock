@@ -1086,6 +1086,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tortue-reqbuilder"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.34 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tortue-reqtraits 0.1.0",
+]
+
+[[package]]
+name = "tortue-reqtraits"
+version = "0.1.0"
+dependencies = [
+ "reqwest 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "tortue-structs"
 version = "0.1.0"
 dependencies = [
@@ -1093,6 +1110,8 @@ dependencies = [
  "serde 1.0.114 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_bytes 0.11.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tortue-bencode 0.1.0",
+ "tortue-reqbuilder 0.1.0",
+ "tortue-reqtraits 0.1.0",
 ]
 
 [[package]]

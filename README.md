@@ -12,3 +12,6 @@ Parser and (de)serializer implementation of the bencode encoding scheme. It seem
 
 Async implementation of the torrent protocol
 
+### Reqbuilder
+
+A simple derive macro to turn a struct into a request builder for reqwest

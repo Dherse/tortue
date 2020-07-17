@@ -10,7 +10,9 @@ edition = "2018"
 members = [
     "tortue-bencode",
     "tortue-structs",
-    "tortue-protocol"
+    "tortue-protocol",
+    "tortue-reqtraits",
+    "tortue-reqbuilder",
 ]
 
 [dependencies]

@@ -1,6 +1,8 @@
 mod metainfo;
+mod tracker;
 
 pub use metainfo::*;
+pub use tracker::*;
 
 #[cfg(test)]
 mod tests {
